@@ -4,6 +4,7 @@ var mongoose = require("mongoose");
 var dbURI = 'mongodb://localhost/Loc8r';
 if(process.env.NODE_ENV === 'production') {
     dbURI = 'mongodb://romy:rocla1@ds025802.mlab.com:25802/loc8r';
+    //dbURI = process.env.MONGOLAB_URI;
 }
 mongoose.connect(dbURI);
 

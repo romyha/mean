@@ -4,19 +4,36 @@ var apiOptions = {
     server: "http://localhost:3000"
 };
 if (process.env.NODE_ENV === 'production') {
-    apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
+    //apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
 }
+
+
+
+//-------------------------------------------------------------------------
+//homepage listing locations
 
 /**Build homepage from API */
 var renderHomepage = function (req, res, responseBody) {
+    var message;
+    if (!(responseBody instanceof Array)) {
+        message = "API lookup error";
+        responseBody = [];
+    } else {
+        if (!responseBody.length) {
+            message = "No places found nearby.";
+        }
+    }
+    console.log(responseBody);
     res.render('locations-list', {
         title: 'Loc8r - find wifi places',
         pageHeader: {
             title: 'Loc8r',
             strapline: 'Find places to work with wifi near you!'
         },
-        locations: responseBody
+        locations: responseBody,
+        message: message
     });
+
 };
 
 /* GET 'home' page*/
@@ -24,78 +41,157 @@ module.exports.homelist = function (req, res, next) {
     var requestOptions, path;
     path = '/api/locations';
     requestOptions = {
-        url : apiOptions.server + path,
-        method : "GET",
-        json : {},
-        qs : {
-            lng : 30,
-            lat : 52,
-            maxDistance: 20
+        url: apiOptions.server + path,
+        method: "GET",
+        json: {},
+        qs: {
+            lng: 13.505,
+            lat: 52.445,
+            maxDistance: 20000      //in meters
         }
     };
-    request(requestOptions, function(err, response, body) {
-        renderHomepage(req, res, body);
+    request(requestOptions, function (err, response, body) {
+        var i, date;
+        data = body;
+        if (response.statusCode === 200 && data.length) {
+            for (i = 0; i < data.length; i++) {
+                data[i].distance = _formatDistance(data[i].distance);
+            }
+        }
+        renderHomepage(req, res, data);
     });
 };
+
+var _formatDistance = function (distance) {
+    var numDistance, unit;
+    if (distance > 1000) {
+        numDistance = parseFloat(distance / 1000).toFixed(1); //display km with 1 dig after point
+        unit = ' km';
+    } else {
+        numDistance = parseInt(distance);
+        unit = ' m';
+    }
+    return numDistance + unit;
+};
+
+
+
+//---------------------------------------------------------------------
+//Details page of location
+
+var renderDetailPage = function (req, res, locDetail) {
+    res.render('location-info', {
+        title: 'Loc8r - ' + locDetail.name,
+        pageHeader: {
+            title: locDetail.name,
+            strapline: 'Find places to work with wifi near you!'
+        },
+        location: locDetail
+    });
+}
+
 
 /* GET 'Location Info' page*/
 module.exports.locationInfo = function (req, res, next) {
-    res.render('location-info', {
-        title: 'Loc8r - find wifi places',
-        pageHeader: {
-            title: 'Loc8r',
-            strapline: 'Find places to work with wifi near you!'
-        },
-        location: {
-            name: 'Starcups',
-            address: 'some street',
-            rating: 3,
-            facilities: ['Hot drinks', 'Food', 'Premium wifi'],
-            coords: {
-                lat: 51.455041,
-                lng: -0.9690884
-            },
-            openingTimes: [{
-                days: 'Monday-Friday',
-                opening: '7:00am',
-                closing: '7:00pm',
-                closed: false
-            }, {
-                    days: 'Saturday',
-                    opening: '8:00am',
-                    closing: '5:00pm',
-                    closed: false
-                }, {
-                    days: 'Sunday',
-                    closed: true
-                }],
-            reviews: [{
-                author: 'Romy Haacke',
-                message: 'What a great Place!',
-                rating: 5,
-                timestamp: '19 May 2016',
-            }, {
-                    author: 'Ben Miller',
-                    message: 'Nice coffee, but slow internet.',
-                    rating: 3,
-                    timestamp: '10 May 2016',
-                }, {
-                    author: 'Max Mustermann',
-                    message: 'Very impolite people, never go there again',
-                    rating: 1,
-                    timestamp: '4 April 2016',
-                }
-            ]
-        }
+    getLocationInfo(req, res, function (req, res, responseData) {
+        renderDetailPage(req, res, responseData);
     });
 };
 
+var _showError = function (req, res, statusCode) {
+    var title, content;
+    if (statusCode === 404) {
+        title = "404, page not found";
+        content = "Oh dear. Looks like we can't find this page. Sorry.";
+    } else {
+        title = statusCode + ", something's gone wrong";
+        content = "Something, somewhere, has gone wrong.";
+    }
+    res.status(statusCode);
+    res.render('generic-text', {
+        title: title,
+        content: content
+    });
+};
+
+
+
+
+//-----------------------------------------------------------------------
+//Add review to location page
+
+var renderReviewForm = function (req, res, locDetail) {
+    res.render('location-review-form', {
+        title: 'Review' + locDetail.name + ' on Loc8r',
+        pageHeader: {
+            title: 'Review ' + locDetail.name
+        },
+        error: req.query.err            //to check if sth went wrong when inputting data
+    });
+};
+
+
 /* GET 'Add Review' page*/
 module.exports.addReview = function (req, res, next) {
-    res.render('location-review-form', {
-        title: 'Review Starcups on Loc8r',
-        pageHeader: {
-            title: 'Review Starcups'
+    getLocationInfo(req, res, function (req, res, responseData) {
+        renderReviewForm(req, res, responseData);
+    });
+};
+
+module.exports.doAddReview = function (req, res) {
+    var requestOptions, path, locationid, postdata;
+    locationid = req.params.locationid;
+    path = '/api/locations/' + locationid + '/reviews';
+    postdata = {
+        author: req.body.name,
+        rating: parseInt(req.body.rating, 10),
+        message: req.body.review
+    };
+    requestOptions = {
+        url: apiOptions.server + path,
+        method: "POST",
+        json: postdata
+    };
+    if (!postdata.author || !postdata.rating || !postdata.message) {
+        res.redirect('/location/' + locationid + '/reviews/new?err=val');
+    } else {
+        request(requestOptions, function (err, response, body) {
+            if (response.statusCode === 201) {
+                res.redirect('/location/' + locationid);
+            } else if (response.statusCode === 400 && body.name && body.name === "ValidationError") {
+                res.redirect('/location/' + locationid + '/reviews/new?err=val');
+            } else {
+                _showError(req, res, response.statusCode);
+            }
+        });
+    }
+};
+
+
+
+
+//----------------------------------------------------------------------
+//
+
+
+var getLocationInfo = function (req, res, callback) {
+    var requestOptions, path;
+    path = '/api/locations/' + req.params.locationid;
+    requestOptions = {
+        url: apiOptions.server + path,
+        method: "GET",
+        json: {}
+    };
+    request(requestOptions, function (err, response, body) {
+        var data = body;
+        if (response.statusCode === 200) {
+            data.coords = {
+                lng: body.coords[0],
+                lat: body.coords[1]
+            };
+            callback(req, res, data);
+        } else {
+            _showError(req, res, response.statusCode);
         }
     });
 };

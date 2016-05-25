@@ -4,7 +4,7 @@ var apiOptions = {
     server: "http://localhost:3000"
 };
 if (process.env.NODE_ENV === 'production') {
-    //apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
+    apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
 }
 
 
@@ -160,7 +160,8 @@ module.exports.doAddReview = function (req, res) {
                 res.redirect('/location/' + locationid);
             } else if (response.statusCode === 400 && body.name && body.name === "ValidationError") {
                 res.redirect('/location/' + locationid + '/reviews/new?err=val');
-            } else {
+            }
+            else {
                 _showError(req, res, response.statusCode);
             }
         });

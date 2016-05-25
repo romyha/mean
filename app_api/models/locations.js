@@ -8,7 +8,7 @@ var reviewSchema = new mongoose.Schema({
         min: 0,
         max: 5
     },
-    message: {type: String}, //, required: true},
+    message: {type: String},//, required: true},
     createdOn: {type: Date, default: Date.now}
 });
 

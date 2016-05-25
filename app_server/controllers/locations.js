@@ -4,7 +4,7 @@ var apiOptions = {
     server: "http://localhost:3000"
 };
 if (process.env.NODE_ENV === 'production') {
-    apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
+    //apiOptions.server = "https://limitless-reef-17194.herokuapp.com";
 }
 
 
@@ -13,53 +13,19 @@ if (process.env.NODE_ENV === 'production') {
 //homepage listing locations
 
 /**Build homepage from API */
-var renderHomepage = function (req, res, responseBody) {
-    var message;
-    if (!(responseBody instanceof Array)) {
-        message = "API lookup error";
-        responseBody = [];
-    } else {
-        if (!responseBody.length) {
-            message = "No places found nearby.";
-        }
-    }
-    console.log(responseBody);
+var renderHomepage = function (req, res) {
     res.render('locations-list', {
         title: 'Loc8r - find wifi places',
         pageHeader: {
             title: 'Loc8r',
             strapline: 'Find places to work with wifi near you!'
-        },
-        locations: responseBody,
-        message: message
+        }
     });
-
 };
 
 /* GET 'home' page*/
 module.exports.homelist = function (req, res, next) {
-    var requestOptions, path;
-    path = '/api/locations';
-    requestOptions = {
-        url: apiOptions.server + path,
-        method: "GET",
-        json: {},
-        qs: {
-            lng: 13.505,
-            lat: 52.445,
-            maxDistance: 20000      //in meters
-        }
-    };
-    request(requestOptions, function (err, response, body) {
-        var i, date;
-        data = body;
-        if (response.statusCode === 200 && data.length) {
-            for (i = 0; i < data.length; i++) {
-                data[i].distance = _formatDistance(data[i].distance);
-            }
-        }
-        renderHomepage(req, res, data);
-    });
+    renderHomepage(req, res);
 };
 
 var _formatDistance = function (distance) {
@@ -126,7 +92,8 @@ var renderReviewForm = function (req, res, locDetail) {
         pageHeader: {
             title: 'Review ' + locDetail.name
         },
-        error: req.query.err            //to check if sth went wrong when inputting data
+        error: req.query.err,            //to check if sth went wrong when inputting data
+        url : req.originalUrl       //to pass it to action for the get request after submitting form
     });
 };
 

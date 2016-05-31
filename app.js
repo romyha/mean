@@ -1,12 +1,16 @@
+require('dotenv').load();
 var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-require('./app_api/models/db');
 var uglifyJs = require("uglify-js");
 var fs = require('fs');   //filesystem needed for uglify
+var passport = require('passport');
+
+require('./app_api/models/db');
+require('./app_api/config/passport');   //strategy
 
 //var routes = require('./app_server/routes/index');
 var routesApi = require('./app_api/routes/index');
@@ -30,18 +34,22 @@ var appClientFiles = [
   'app_client/locationDetail/locationDetail.controller.js',
   'app_client/common/services/geolocation.service.js',
   'app_client/common/services/loc8rData.service.js',
+  'app_client/common/services/authentication.service.js',
   'app_client/common/filters/formatDistance.filter.js',
   'app_client/common/directives/ratingStars/ratingStars.directive.js',
   'app_client/common/directives/footerGeneric/footerGeneric.directive.js',
   'app_client/common/directives/navigation/navigation.directive.js',
+  'app_client/common/directives/navigation/navigation.controller.js',
   'app_client/common/directives/pageHeader/pageHeader.directive.js',
-  'app_client/common/filters/addHtmlLineBreaks.filter.js'  
-  
-];
-var uglified = uglifyJs.minify(appClientFiles, { compress : false });
+  'app_client/common/filters/addHtmlLineBreaks.filter.js',
+  'app_client/auth/register/register.controller.js',
+  'app_client/auth/login/login.controller.js'
 
-fs.writeFile('public/Angular/loc8r.min.js', uglified.code, function(err){
-  if(err){
+];
+var uglified = uglifyJs.minify(appClientFiles, { compress: false });
+
+fs.writeFile('public/Angular/loc8r.min.js', uglified.code, function (err) {
+  if (err) {
     console.log(err);
   } else {
     console.log('Script generated and saved: loc8r.min.js');
@@ -57,16 +65,18 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'app_client')));
 
+app.use(passport.initialize());
+
 //app.use('/', routes);   //comment to not rely on server routing, but on SPA
 app.use('/api', routesApi);
 app.use('/users', users);
 
-app.use(function(req,res){
+app.use(function (req, res) {
   res.sendFile(path.join(_dirname, 'app_client', 'index.html'));
 });
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   var err = new Error('Not Found');
   err.status = 404;
   next(err);
@@ -74,10 +84,18 @@ app.use(function(req, res, next) {
 
 // error handlers
 
+//catch unauthorised errors
+app.use(function (err, req, res, next) {
+  if (err.name === 'UnauthorizedError') {
+    res.status(401);
+    res.json({ "message": err.name + ": " + err.message });
+  }
+});
+
 // development error handler
 // will print stacktrace
 if (app.get('env') === 'development') {
-  app.use(function(err, req, res, next) {
+  app.use(function (err, req, res, next) {
     res.status(err.status || 500);
     res.render('error', {
       message: err.message,
@@ -88,7 +106,7 @@ if (app.get('env') === 'development') {
 
 // production error handler
 // no stacktraces leaked to user
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render('error', {
     message: err.message,

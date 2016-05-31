@@ -8,7 +8,7 @@
         
         vm.onSubmit = function () {
             vm.formError = "";
-            if (!vm.formData.name || !vm.formData.rating || !vm.formData.message) {
+            if (!vm.formData.rating || !vm.formData.message) {
                 vm.formError = "All fields required";
                 return false;
             } else {
@@ -19,7 +19,6 @@
         
         vm.doAddReview = function(locationid, formData) {
             loc8rData.addReviewById(locationid, {
-                author : formData.name,
                 rating : formData.rating,
                 message : formData.message
             }).success(function(data) {
